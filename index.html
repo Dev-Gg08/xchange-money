@@ -155,22 +155,22 @@
                     <!-- QR PromptPay -->
                     <div class="payment-card" data-channel="qr"
                         style="display:flex; align-items:center; gap:20px; background:white; padding:24px; border-radius:28px; box-shadow:var(--shadow-soft); cursor:pointer;">
-                        <img src="https://media.discordapp.net/attachments/1110000000000000000/1342759972323885066/image.png"
-                            style="width: 64px; height: 64px; border-radius: 16px;">
+                        <img src="https://media.discordapp.net/attachments/1110000000000000000/1342784535359164478/image.png"
+                            style="width: 64px; height: 64px; border-radius: 16px; object-fit: contain;">
                         <div style="text-align:left;">
                             <h3 style="font-weight:700;">เติมเงินผ่าน QR</h3>
-                            <p style="font-size:12px; color:var(--text-sub);">ค่าธรรมเนียม 0% (ไม่มีนโยบายคืนเงิน)</p>
+                            <p style="font-size:12px; color:var(--text-sub);">Thai QR Payment (0% Fee)</p>
                         </div>
                     </div>
 
                     <!-- TrueMoney Wallet -->
                     <div class="payment-card" data-channel="truemoney"
                         style="display:flex; align-items:center; gap:20px; background:white; padding:24px; border-radius:28px; box-shadow:var(--shadow-soft); cursor:pointer;">
-                        <img src="https://media.discordapp.net/attachments/1110000000000000000/1342759972827074570/image.png"
-                            style="width: 64px; height: 64px; border-radius: 16px;">
+                        <img src="https://media.discordapp.net/attachments/1110000000000000000/1342784535803920424/image.png"
+                            style="width: 64px; height: 64px; border-radius: 16px; object-fit: contain;">
                         <div style="text-align:left;">
                             <h3 style="font-weight:700;">เติมเงินผ่าน TrueMoney</h3>
-                            <p style="font-size:12px; color:var(--text-sub);">พร้อมใช้งาน</p>
+                            <p style="font-size:12px; color:var(--text-sub);">Wallet App Only</p>
                         </div>
                     </div>
 
@@ -208,11 +208,28 @@
                     </a>
                 </div>
             </section>
+
+            <!-- Scanner View -->
+            <section id="scanner-view" class="view">
+                <header class="header">
+                    <h2 class="chart-title">QR Scanner</h2>
+                </header>
+                <div class="scanner-container"
+                    style="background: white; padding: 24px; border-radius: 32px; box-shadow: var(--shadow-soft); text-align: center;">
+                    <div id="reader" style="width: 100%; border-radius: 20px; overflow: hidden; background: #f8fafc;">
+                    </div>
+                    <div id="scan-result"
+                        style="margin-top: 20px; padding: 16px; border-radius: 16px; background: #FFF1F2; color: #EF4444; font-size: 14px; display: none;">
+                        <i class="fas fa-info-circle"></i> <span id="scan-text">Ready to scan</span>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <nav class="bottom-nav">
             <div class="nav-btn active" data-view="home"><i class="fas fa-home"></i></div>
             <div class="nav-btn" data-view="topup"><i class="fas fa-plus-circle"></i></div>
+            <div class="nav-btn" data-view="scanner"><i class="fas fa-qrcode"></i></div>
             <div class="nav-btn" data-view="history"><i class="fas fa-receipt"></i></div>
         </nav>
     </div>
@@ -226,7 +243,7 @@
             </div>
 
             <div class="modal-body">
-                <img id="topup-channel-icon" src="" class="modal-logo" style="display: none;">
+                <img id="topup-channel-icon" src="" class="modal-logo" style="display: none; object-fit: contain;">
 
                 <!-- Step 1: Input Amount -->
                 <div id="topup-step-1" class="modal-step active">
@@ -240,10 +257,17 @@
 
                 <!-- Step 2: Show QR -->
                 <div id="topup-step-2" class="modal-step">
-                    <div class="qr-box">
-                        <div id="qrcode-container"></div>
+                    <div class="qr-box" style="position: relative; padding: 0; background: none; border-radius: 0;">
+                        <!-- Official Template Background -->
+                        <img src="https://media.discordapp.net/attachments/1110000000000000000/1342784536294375484/image.png"
+                            style="width: 100%; border-radius: 24px; box-shadow: var(--shadow-soft);">
+                        <!-- Generated QR Overlay -->
+                        <div id="qrcode-container"
+                            style="position: absolute; top: 15.5%; left: 50%; transform: translateX(-50%); width: 48%;">
+                        </div>
                     </div>
-                    <button class="btn-secondary" id="btn-download-qr" style="margin-bottom:16px;">
+
+                    <button class="btn-secondary" id="btn-download-qr" style="margin-top: 16px; margin-bottom:16px;">
                         <i class="fas fa-download"></i> ดาวน์โหลด QR Code
                     </button>
                     <div style="font-weight:700; font-size:18px; margin-bottom:8px;">จำนวนเงิน: <span
@@ -261,6 +285,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
     <script type="module" src="app.js"></script>
 </body>
 
