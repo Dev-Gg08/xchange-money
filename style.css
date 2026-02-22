@@ -121,13 +121,26 @@ body {
     position: relative;
     display: flex;
     align-items: center;
+    width: 100%;
 }
 
-.input-wrapper i {
+.input-icon {
     position: absolute;
     left: 20px;
-    color: #9CA3AF;
-    font-size: 18px;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    pointer-events: none;
+}
+
+.modal-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    margin: 0 auto 20px;
+    display: block;
+    object-fit: cover;
+    box-shadow: var(--shadow-soft);
 }
 
 .input-wrapper input {

@@ -226,10 +226,15 @@
             </div>
 
             <div class="modal-body">
+                <img id="topup-channel-icon" src="" class="modal-logo" style="display: none;">
+
                 <!-- Step 1: Input Amount -->
                 <div id="topup-step-1" class="modal-step active">
-                    <input type="number" id="topup-amount" value="100" placeholder="0"
-                        style="width:100%; padding:18px; border-radius:18px; border:1px solid #E5E7EB; margin-bottom:24px; font-size:24px; text-align:center; outline:none;">
+                    <div class="input-wrapper" style="margin-bottom: 24px;">
+                        <span class="input-icon">฿</span>
+                        <input type="number" id="topup-amount" value="100" placeholder="0"
+                            style="width:100%; padding:18px 18px 18px 48px; border-radius:18px; border:1px solid #E5E7EB; font-size:24px; text-align:center; outline:none; font-weight: 700;">
+                    </div>
                     <button id="btn-topup-next" class="btn-primary">เติมเงิน</button>
                 </div>
 

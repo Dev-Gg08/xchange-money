@@ -142,9 +142,24 @@ function openTopupModal(channel) {
     activeChannel = channel;
     const modal = document.getElementById('topup-modal');
     const title = document.getElementById('topup-modal-title');
-    const titles = { qr: 'เติมเงินผ่านการสแกน QR', truemoney: 'เติมเงินผ่าน TrueMoney', angpao: 'เติมเงินผ่านโค้ด' };
+    const icon = document.getElementById('topup-channel-icon');
 
-    title.textContent = titles[channel] || 'เติมเงิน';
+    const channelData = {
+        qr: { title: 'เติมเงินผ่านการสแกน QR', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759972323885066/image.png' },
+        truemoney: { title: 'เติมเงินผ่าน TrueMoney', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759972827074570/image.png' },
+        angpao: { title: 'เติมเงินผ่านโค้ด', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759973271732314/image.png' }
+    };
+
+    const data = channelData[channel] || { title: 'เติมเงิน', icon: '' };
+    title.textContent = data.title;
+
+    if (data.icon) {
+        icon.src = data.icon;
+        icon.style.display = 'block';
+    } else {
+        icon.style.display = 'none';
+    }
+
 
     // Reset steps
     document.getElementById('topup-step-1').classList.add('active');
