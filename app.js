@@ -1,12 +1,18 @@
+// --- Firebase Config ---
+const firebaseConfig = {
+    databaseURL: "https://math-50c44-default-rtdb.firebaseio.com/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-// --- Supabase Config ---
+// --- Supabase Config (Keep for Auth) ---
 const SUPABASE_URL = "https://xhoiouzraqoyvevbxefj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_K3hyy5i7tZ5J9Z4WtTop1g_ZFAW06R5";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- State ---
 let currentUser = null;
-let profile = null;
+let profile = { full_name: 'Guest', balance: 0 };
 
 // --- Views Management ---
 function switchView(viewName) {
@@ -15,6 +21,7 @@ function switchView(viewName) {
         register: document.getElementById('register-view'),
         home: document.getElementById('home-view'),
         topup: document.getElementById('topup-view'),
+        scanner: document.getElementById('scanner-view'),
         history: document.getElementById('history-view')
     };
     const mainContent = document.getElementById('main-content');
@@ -52,6 +59,9 @@ function switchView(viewName) {
     });
 
     if (viewName === 'home') generateChart();
+    if (viewName === 'scanner') startScanner();
+    else stopScanner();
+    if (viewName === 'history') fetchHistory();
 }
 
 // --- Auth Logic ---
@@ -92,7 +102,7 @@ async function handleRegister(e) {
     if (error) {
         alert("Registration failed: " + error.message);
     } else {
-        alert("สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลของคุณเพื่อยืนยัน (ถ้ามี) หรือเข้าสู่ระบบ");
+        alert("สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ");
         switchView('login');
     }
 }
@@ -100,17 +110,19 @@ async function handleRegister(e) {
 async function initSession(user) {
     currentUser = user;
 
-    // Fetch user profile from public.profiles (assuming it exists or using user metadata)
     const displayName = user.user_metadata.full_name || user.email;
     document.getElementById('display-username').textContent = displayName;
     document.getElementById('user-avatar').src = `https://ui-avatars.com/api/?background=4F46E5&color=fff&name=${encodeURIComponent(displayName)}`;
 
-    // Get balance (or simulate if no profile table yet)
-    // For demo, we check a 'profiles' table or set default
-    const { data: profileData } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
-    const balance = profileData ? profileData.balance : 0;
-    document.getElementById('display-balance').textContent = balance.toLocaleString(undefined, { minimumFractionDigits: 2 });
+    // Fetch user profile
+    const { data: profileData } = await supabase.from('profiles').select('full_name, balance').eq('id', user.id).single();
+    if (profileData) {
+        profile = profileData;
+    } else {
+        profile = { full_name: displayName, balance: 0 };
+    }
 
+    document.getElementById('display-balance').textContent = profile.balance.toLocaleString('th-TH', { minimumFractionDigits: 2 });
     switchView('home');
 }
 
@@ -145,8 +157,8 @@ function openTopupModal(channel) {
     const icon = document.getElementById('topup-channel-icon');
 
     const channelData = {
-        qr: { title: 'เติมเงินผ่านการสแกน QR', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759972323885066/image.png' },
-        truemoney: { title: 'เติมเงินผ่าน TrueMoney', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759972827074570/image.png' },
+        qr: { title: 'เติมเงินผ่านการสแกน QR', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342784535359164478/image.png' },
+        truemoney: { title: 'เติมเงินผ่าน TrueMoney', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342784535803920424/image.png' },
         angpao: { title: 'เติมเงินผ่านโค้ด', icon: 'https://media.discordapp.net/attachments/1110000000000000000/1342759973271732314/image.png' }
     };
 
@@ -160,11 +172,46 @@ function openTopupModal(channel) {
         icon.style.display = 'none';
     }
 
-
     // Reset steps
     document.getElementById('topup-step-1').classList.add('active');
     document.getElementById('topup-step-2').classList.remove('active');
     modal.classList.add('active');
+}
+
+// --- Scanner Logic ---
+let html5QrCode = null;
+
+async function startScanner() {
+    if (html5QrCode) return;
+    html5QrCode = new Html5Qrcode("reader");
+    const scanResult = document.getElementById('scan-result');
+    const scanText = document.getElementById('scan-text');
+
+    try {
+        await html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
+            (decodedText) => {
+                scanResult.style.display = 'block';
+                scanText.textContent = `Scanned: ${decodedText}`;
+                if (navigator.vibrate) navigator.vibrate(100);
+            },
+            (errorMessage) => { }
+        );
+    } catch (err) {
+        console.error("Scanner error:", err);
+    }
+}
+
+async function stopScanner() {
+    if (html5QrCode) {
+        try {
+            await html5QrCode.stop();
+            html5QrCode = null;
+        } catch (err) {
+            console.error("Stop scanner error:", err);
+        }
+    }
 }
 
 document.getElementById('btn-topup-next').addEventListener('click', () => {
@@ -183,133 +230,137 @@ document.getElementById('btn-topup-next').addEventListener('click', () => {
 
 async function generateQR(amount) {
     const container = document.getElementById('qrcode-container');
+    const templateImg = document.getElementById('qr-template-img');
+
+    templateImg.style.display = 'block';
+
+    // If it's the QR channel, we show the static PromptPay image provided by the user
+    if (activeChannel === 'qr') {
+        templateImg.src = "https://media.discordapp.net/attachments/1110000000000000000/1342811400811806771/image.png";
+        container.innerHTML = ''; // No overlay needed for this static image
+        return;
+    }
+
+    // Default template for other channels if any
+    templateImg.src = "https://media.discordapp.net/attachments/1110000000000000000/1342784536294375484/image.png";
     container.innerHTML = '<div style="padding:20px;">กำลังสร้าง QR Code...</div>';
 
-    // Generate simple PromptPay payload (mocked for demo as per user screenshots logic)
+    // Fallback for other channels
     const payload = `00020101021129370016A0000006770101110113006694XXXXXX5802TH53037645405${amount.toFixed(2).length}${amount.toFixed(2)}6304`;
 
     QRCode.toCanvas(payload, {
-        width: 250,
-        margin: 2,
-        color: { dark: '#1e293b', light: '#ffffff' }
+        width: 180,
+        margin: 0,
+        color: { dark: '#002d5d', light: '#ffffff00' }
     }, (err, canvas) => {
         container.innerHTML = '';
         if (err) container.innerHTML = "QR Error";
-        else container.appendChild(canvas);
+        else {
+            canvas.style.width = "100%";
+            canvas.style.height = "auto";
+            container.appendChild(canvas);
+        }
     });
 }
 
-document.getElementById('btn-confirm-payment').addEventListener('click', async () => {
-    const amount = parseFloat(document.getElementById('display-amount').textContent.replace(/,/g, ''));
-    const btn = document.getElementById('btn-confirm-payment');
+// Slip Preview Logic
+document.getElementById('slip-upload').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+            const preview = document.getElementById('slip-preview');
+            preview.querySelector('img').src = event.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
 
+document.getElementById('btn-confirm-payment').addEventListener('click', async () => {
+    const amount = parseFloat(document.getElementById('topup-amount').value);
+    const slipFile = document.getElementById('slip-upload').files[0];
+
+    if (!slipFile) {
+        alert("กรุณาแนบสลิปเพื่อยืนยันการชำระเงิน");
+        return;
+    }
+
+    const btn = document.getElementById('btn-confirm-payment');
     btn.disabled = true;
-    btn.textContent = "กำลังตรวจสอบ...";
+    btn.textContent = "กำลังส่งข้อมูล...";
+
+    const orderId = 'ORD-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 
     try {
-        // 1. Update Balance in Supabase (Increment)
-        // Note: Real apps should use an RPC function or careful atomic updates
-        const { data: currentProfile } = await supabase.from('profiles').select('balance').eq('id', currentUser.id).single();
-        const newBalance = (currentProfile?.balance || 0) + amount;
-
-        const { error: balError } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', currentUser.id);
-
-        if (balError) throw balError;
-
-        // 2. Record Transaction
-        const { error: txError } = await supabase.from('transactions').insert({
-            user_id: currentUser.id,
+        await db.ref('orders/' + orderId).set({
+            orderId: orderId,
+            userId: currentUser.id,
+            userName: profile.full_name,
             amount: amount,
-            type: 'topup',
-            memo: `เติมเงินผ่าน ${activeChannel}`
+            channel: activeChannel,
+            status: 'pending',
+            timestamp: Date.now(),
+            memo: `Top-up via ${activeChannel}`
         });
 
-        if (txError) throw txError;
-
-        alert("เติมเงินสำเร็จ! ยอดเงินจะอัปเดตทันที");
+        alert(`บันทึกข้อมูลเรียบร้อย! รหัสรายการ: ${orderId}\nกรุณารอแอดมินตรวจสอบสลิปของคุณ`);
         document.getElementById('topup-modal').classList.remove('active');
-
-        // 3. Update Sync
-        document.getElementById('display-balance').textContent = newBalance.toLocaleString(undefined, { minimumFractionDigits: 2 });
-        if (document.getElementById('main-content').style.display === 'block') fetchHistory();
-
-    } catch (err) {
-        alert("เกิดข้อผิดพลาด: " + err.message);
+        switchView('history');
+    } catch (error) {
+        console.error("Firebase error:", error);
+        alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     } finally {
         btn.disabled = false;
         btn.textContent = "ยืนยันการชำระเงิน";
+        document.getElementById('slip-upload').value = '';
+        document.getElementById('slip-preview').style.display = 'none';
     }
 });
 
 async function fetchHistory() {
     const container = document.getElementById('history-list-container');
-    if (!container) return;
+    if (!currentUser) return;
 
-    const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false });
+    try {
+        const snapshot = await db.ref('orders').orderByChild('userId').equalTo(currentUser.id).once('value');
+        const data = snapshot.val();
 
-    if (error) {
-        container.innerHTML = '<div style="color:red; padding:20px;">โหลดประวัติไม่สำเร็จ</div>';
-        return;
-    }
+        if (!data) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-sub); padding: 40px 0;">No history yet</div>';
+            return;
+        }
 
-    if (!data || data.length === 0) {
-        container.innerHTML = '<div style="text-align: center; color: var(--text-sub); padding: 40px 0;">ยังไม่มีประวัติการทำรายการ</div>';
-        return;
-    }
+        const historyArray = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+        container.innerHTML = '';
+        historyArray.forEach(item => {
+            const date = new Date(item.timestamp).toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            });
+            const statusColor = item.status === 'pending' ? '#F59E0B' : (item.status === 'success' ? '#10B981' : '#EF4444');
+            const statusText = item.status === 'pending' ? 'รอตรวจสอบ' : (item.status === 'success' ? 'สำเร็จ' : 'ถูกปฏิเสธ');
 
-    container.innerHTML = '';
-    data.forEach(item => {
-        const div = document.createElement('div');
-        div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:white; padding:20px; border-radius:24px; margin-bottom:12px; box-shadow:var(--shadow-soft);";
-        const date = new Date(item.created_at).toLocaleString('th-TH');
-        div.innerHTML = `
-            <div style="display:flex; align-items:center; gap:16px;">
-                <div style="width:40px; height:40px; background:#FEE2E2; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#EF4444;"><i class="fas fa-plus"></i></div>
-                <div style="text-align:left;">
-                    <div style="font-weight:700; font-size:14px;">${item.memo}</div>
-                    <div style="font-size:12px; color:var(--text-sub);">${date}</div>
+            const card = document.createElement('div');
+            card.style = "background: white; padding: 20px; border-radius: 24px; box-shadow: var(--shadow-soft); margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;";
+            card.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; background: #FFF1F2; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary);">
+                        <i class="fas ${item.channel === 'qr' ? 'fa-qrcode' : 'fa-wallet'}"></i>
+                    </div>
+                    <div style="text-align: left;">
+                        <div style="font-weight: 700; font-size: 15px;">${item.memo}</div>
+                        <div style="font-size: 12px; color: var(--text-sub);">${date} | ID: ${item.orderId}</div>
+                    </div>
                 </div>
-            </div>
-            <div style="font-weight:700; color:#10B981;">+฿${item.amount.toLocaleString()}</div>
-        `;
-        container.appendChild(div);
-    });
-}
-
-// Update switchView to fetch history when needed
-const _switchView = switchView;
-switchView = function (viewName) {
-    _switchView(viewName);
-    if (viewName === 'history') fetchHistory();
-};
-
-// Logout
-const logoutBtn = document.getElementById('btn-logout');
-if (logoutBtn) {
-    logoutBtn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        location.reload();
-    });
-}
-
-// --- Initialization ---
-const loginForm = document.getElementById('login-form');
-if (loginForm) loginForm.addEventListener('submit', handleLogin);
-
-const regForm = document.getElementById('register-form');
-if (regForm) regForm.addEventListener('submit', handleRegister);
-
-// Check current session
-async function checkCurrentSession() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-        initSession(session.user);
-    } else {
-        switchView('login');
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; color: var(--primary);">+฿${item.amount.toLocaleString()}</div>
+                    <div style="font-size: 11px; font-weight: 600; color: ${statusColor};">${statusText}</div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } catch (error) {
+        console.error("Fetch history error:", error);
     }
 }
 
@@ -330,20 +381,38 @@ function generateChart() {
     }
 }
 
-async function handleGoogleLogin() {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-            redirectTo: window.location.origin + window.location.pathname
-        }
-    });
-    if (error) alert("Google Login error: " + error.message);
+async function checkCurrentSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) initSession(session.user);
+    else switchView('login');
 }
 
-document.getElementById('btn-google-login')?.addEventListener('click', handleGoogleLogin);
+// Initialization
+document.getElementById('login-form')?.addEventListener('submit', handleLogin);
+document.getElementById('register-form')?.addEventListener('submit', handleRegister);
+document.getElementById('btn-google-login')?.addEventListener('click', async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google' });
+});
+
+document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    location.reload();
+});
 
 checkCurrentSession();
-generateChart();
 const now = new Date();
 const dateEl = document.getElementById('display-date');
 if (dateEl) dateEl.innerHTML = `${now.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })} <i class="fas fa-chevron-down"></i>`;
+document.getElementById('btn-download-qr')?.addEventListener('click', () => {
+    const templateImg = document.getElementById('qr-template-img');
+    if (templateImg && templateImg.src) {
+        const link = document.createElement('a');
+        link.href = templateImg.src;
+        link.download = `PromptPay_QR_${activeChannel}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else {
+        alert("ไม่พบรูปภาพ QR สำหรับดาวน์โหลด");
+    }
+});
